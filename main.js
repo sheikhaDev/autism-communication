@@ -186,7 +186,7 @@ function sim(){
  '<div class="room-frame"><canvas id="room3" tabindex="0" aria-label="مجلس ثلاثي الأبعاد. اسحب لتلتفت، واستعمل الأسهم للمشي. اسحب الغرض المطلوب إلى مكانه قرب الطفلة: التفاحة في الصحن، الماء على الطاولة، واللعبة في الكرتون."></canvas><div id="dropGuide" class="drop-guide" aria-hidden="true"></div><div class="move-pad" dir="ltr"><button data-m="left" aria-label="تحرك يسارًا">◀</button><button data-m="forward" aria-label="تقدّم">▲</button><button data-m="right" aria-label="تحرك يمينًا">▶</button><button data-m="back" aria-label="تراجع">▼</button></div><button id="centerCamera" aria-label="واجه الطاولة">⌖</button></div><div class="footer"><span id="mark" class="feedback" role="status"></span>'+'<span id="steps">'+dots(turn)+'</span>'+'<button class="action" hidden id="next" aria-label="التالي">←</button></div>';
  wire();const instructions=document.createElement('p');instructions.className='info sim-instructions';instructions.textContent='اسمع الطلب، ثم اسحب الغرض إلى الطفل';v.querySelector('.room-frame').before(instructions);const canvas=$('#room3'),renderer=roomRenderer(canvas),fixed=furnishedRoom(),starts=objectsAt.map(([x,z])=>[x,floorCupY,z]),pos=starts.map(p=>p.slice());
  const cam={x:0,y:1.48,z:2.85,yaw:0,pitch:-.22};
- let held=false,complete=false,gesture=null,frame=0,dirty=true,active=true,prev=0,resizeObs,aspect=1;
+ let carried=-1,carryFrom=null;let held=false,complete=false,gesture=null,frame=0,dirty=true,active=true,prev=0,resizeObs,aspect=1;
  let girlFrame=0;const reducedMotion=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;const movements=new Map();
  function updateGeometry(){const m=meshBuilder();addProps(m,pos,complete?-1:target);addOmaniChild(m,girlFrame);renderer.set(fixed.concat(m.faces));dirty=true}
  function size(){const r=canvas.getBoundingClientRect(),dpr=Math.min(1.7,window.devicePixelRatio||1);canvas.width=Math.max(2,Math.round(r.width*dpr));canvas.height=Math.max(2,Math.round(r.height*dpr));aspect=canvas.width/canvas.height;center();dirty=true}
@@ -197,7 +197,7 @@ function sim(){
  if(legal(x,cam.z))cam.x=x;if(legal(cam.x,z))cam.z=z;dirty=true}
  function tick(now){if(!active)return;if(complete&&advanceAt&&performance.now()>=advanceAt&&!$('#config').open){advance();if(!active)return}const nextFrame=complete?(reducedMotion?2:1+Math.floor(now/230)%2):0;if(girlFrame!==nextFrame){girlFrame=nextFrame;updateGeometry()}const dt=Math.min(.045,(now-prev)/1000||0);prev=now;for(const dir of new Set(movements.values()))move(dir,dt);if(dirty){renderer.draw(cam);drawGuide();dirty=false}frame=requestAnimationFrame(tick)}
  const xy=e=>{const r=canvas.getBoundingClientRect();return [(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height]};
- function place(){if(!held||complete)return;held=false;complete=true;pos[target]=goals[target].slice();girlFrame=1;updateGeometry();$('#mark').textContent='أحسنت! ✓';replay=()=>{};say('praise');advanceAt=performance.now()+(muted?2400:4500);if(player){const reward=player;reward.onended=()=>{if(active&&player===reward&&complete)advanceAt=performance.now()+1800}}}
+ function place(){if(!held||complete)return;if(carried!==target){returnProp();return;}held=false;complete=true;pos[target]=goals[target].slice();girlFrame=1;updateGeometry();$('#mark').textContent='أحسنت! ✓';replay=()=>{};say('praise');advanceAt=performance.now()+(muted?2400:4500);if(player){const reward=player;reward.onended=()=>{if(active&&player===reward&&complete)advanceAt=performance.now()+1800}}}
  function project(p){const {view,f}=cameraMath(cam,aspect),[x,y,z]=view(p);return z>.05?[.5+x*f/(2*z*aspect),.5-y*f/(2*z)]:null}
  function targetArea(){const r=canvas.getBoundingClientRect(),c=project([goals[target][0],goals[target][1]+.08,goals[target][2]]);if(!c)return null;
  const neighbors=goals.map((g,i)=>i===target?null:project([g[0],g[1]+.08,g[2]])).filter(Boolean);
@@ -209,23 +209,23 @@ function sim(){
  pos.forEach((p,i)=>{const c=project([p[0],p[1]+.18,p[2]]);if(!c)return;const d=Math.hypot((nx-c[0])*r.width,(ny-c[1])*r.height);if(d<distance){distance=d;nearest=i+1}});return nearest||hit}
  function dragPoint(nx,ny){const f=1/Math.tan(.54),u=(2*nx-1)*aspect/f,v=(1-2*ny)/f,cp=Math.cos(cam.pitch),sp=Math.sin(cam.pitch),sy=Math.sin(cam.yaw),cy=Math.cos(cam.yaw),fw=cp-v*sp,dz=u*sy-fw*cy,t=(.50-cam.z)/dz;
  if(t<=0||!isFinite(t))return null;return [cam.x+t*(u*cy+fw*sy),cam.y+t*(v*cp+sp)-.15,.50]}
- function returnProp(){held=false;pos[target]=starts[target].slice();updateGeometry()}
+ function returnProp(){if(carried>=0&&carryFrom)pos[carried]=carryFrom.slice();held=false;carried=-1;carryFrom=null;updateGeometry()}
 
  function advance(){advanceAt=0;if(++turn===order.length){real();return}
- target=order[turn];key=items[target][0];complete=false;girlFrame=0;held=false;gesture=null;
+ target=order[turn];key=items[target][0];complete=false;girlFrame=0;held=false;carried=-1;carryFrom=null;gesture=null;
  $('#goal').innerHTML=pic(key,items[target][1]);$('#steps').innerHTML=dots(turn);$('#mark').textContent='';updateGeometry();childRequest()}
- function pick(id){if(complete||held||id<1||id>3)return;if(id!==target+1)return;held=true;pos[target][1]+=.23;$('#mark').textContent='';updateGeometry()}
+ function pick(id){if(complete||id<1||id>3)return;if(held)returnProp();carried=id-1;carryFrom=pos[carried].slice();held=true;pos[carried][1]+=.23;$('#mark').textContent='';updateGeometry()}
  canvas.onpointerdown=e=>{if(gesture)return;e.preventDefault();const [nx,ny]=xy(e);const id=pickupId(nx,ny,renderer.hit(cam,nx,ny));
  gesture={pointer:e.pointerId,id,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,drag:false,carrying:false};canvas.setPointerCapture(e.pointerId)};
  canvas.onpointermove=e=>{const g=gesture;if(!g||e.pointerId!==g.pointer)return;
- if(!g.drag&&Math.hypot(e.clientX-g.x,e.clientY-g.y)>6){g.drag=true;if(!complete&&g.id===target+1){if(!held)pick(g.id);g.carrying=held}}
- if(g.drag){if(g.carrying){const [nx,ny]=xy(e);const p=dragPoint(nx,ny);if(p){pos[target]=destination(nx,ny)?goals[target].slice():p;updateGeometry()}}
+ if(!g.drag&&Math.hypot(e.clientX-g.x,e.clientY-g.y)>6){g.drag=true;if(!complete&&g.id>=1&&g.id<=3){if(!held||carried!==g.id-1)pick(g.id);g.carrying=held}}
+ if(g.drag){if(g.carrying){const [nx,ny]=xy(e);const p=dragPoint(nx,ny);if(p){pos[carried]=carried===target&&destination(nx,ny)?goals[target].slice():p;updateGeometry()}}
  else{cam.yaw-=(e.clientX-g.lastX)*.006;cam.pitch=clamp(cam.pitch+(e.clientY-g.lastY)*.005,-.94,.65);dirty=true}}
  g.lastX=e.clientX;g.lastY=e.clientY};
  canvas.onpointerup=e=>{const g=gesture;if(!g||e.pointerId!==g.pointer)return;gesture=null;
  const [nx,ny]=xy(e);
- if(!g.drag){if(!held)pick(g.id);else if(destination(nx,ny))place()}
- if(g.carrying){if(destination(nx,ny))place();else returnProp()}
+ if(!g.drag){if(!held)pick(g.id);else if(destination(nx,ny)){if(carried===target)place();else returnProp()}}
+ if(g.carrying){if(carried===target&&destination(nx,ny))place();else returnProp()}
  if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId)};
  canvas.onpointercancel=canvas.onlostpointercapture=e=>{if(gesture?.pointer===e.pointerId){if(gesture.carrying)returnProp();gesture=null}};
 
