@@ -5,9 +5,19 @@ const pic=(key,alt='')=>'<img draggable="false" src="'+media[key]+'" alt="'+alt+
 const dots=n=>'<div aria-hidden="true">'+items.map((_,i)=>'<i class="dot '+(i<=n?'on':'')+'"></i>').join('')+'</div>';
 const row=()=>'<div class="choices">'+items.map(([k,n],i)=>'<button class="choice" data-i="'+i+'" aria-label="'+n+'">'+pic(k,n)+'</button>').join('')+'</div>';
 const recordings={"apple": "sounds/apple.mp3", "water": "sounds/water.mp3", "toy": "sounds/toy.mp3", "praise": "sounds/praise.mp3", "sim": "sounds/sim.mp3", "real": "sounds/real.mp3", "done": "sounds/done.mp3"};
-let player,muted=false,replay=()=>{},round=0,chosen=null,pauseId;
-function stop(){if(player){player.pause();player=null}}
-function speakSequence(keys){stop();if(muted)return;function playAt(i){if(i>=keys.length)return;const sound=recordings[keys[i]];if(!sound)return;const a=new Audio(sound);player=a;a.onended=()=>{if(player===a&&!muted)playAt(i+1)};a.play().catch(()=>{})}playAt(0)}
+let player,audioElement,audioToken=0,muted=false,replay=()=>{},round=0,chosen=null,pauseId;
+function stop(){audioToken++;if(player){player.onended=null;player.onerror=null;player.pause();player=null}}
+function audioHint(blocked){const b=$('#repeat');if(!b)return;b.textContent=blocked?'🔊':'↻';b.setAttribute('aria-label',blocked?'اضغط لسماع الطلب':'أعد سماع التعليمات')}
+function speakSequence(keys){stop();if(muted)return;const token=audioToken;
+ // Keep one media element: Safari grants playback permission to the element.
+ const a=audioElement||(audioElement=new Audio());a.preload='auto';
+ function playAt(i){if(token!==audioToken||muted||i>=keys.length)return;const sound=recordings[keys[i]];if(!sound)return;
+ a.onended=null;a.onerror=null;a.src=sound;player=a;
+ a.onended=()=>{if(token===audioToken&&player===a&&!muted)playAt(i+1)};
+ a.onerror=()=>{if(token===audioToken&&!muted)audioHint(true)};
+ try{const result=a.play();if(result?.then)result.then(()=>{if(token===audioToken)audioHint(false)}).catch(()=>{if(token===audioToken&&!muted)audioHint(true)})}catch{if(token===audioToken&&!muted)audioHint(true)}
+ }playAt(0)}
+
 function say(key){speakSequence([key])}
 function prompt(key){replay=()=>say(key);replay()}
 let cleanupRoom=null,pauseRoom=null;
