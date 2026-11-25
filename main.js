@@ -19,7 +19,7 @@ function nav(){reset();v.innerHTML='<section class="activity-menu"><h1>اختر 
 function nextButton(fn,label='التالي'){const b=$('#next');b.hidden=false;b.onclick=fn}
 function learn(){reset();const [key,name]=items[round];v.innerHTML=title('أتعرّف')+'<div class="panel">'+dots(round)+'<button class="target" id="sample" aria-label="اسمع اسم '+name+'">'+pic(key,name)+'</button>'+row()+'<div class="feedback" id="mark" role="status"></div><button hidden id="next" class="action" aria-label="التالي">←</button></div>';wire();stop();replay=()=>say(key);$('#sample').onclick=replay;v.querySelectorAll('.choice').forEach((b,i)=>b.onclick=()=>{const selectedKey=items[i][0];if(i!==round){say(selectedKey);v.querySelectorAll('.choice')[round].classList.add('hint');return}v.querySelectorAll('.choice').forEach(c=>c.disabled=true);b.className='choice correct';$('#mark').textContent='✓';replay=()=>say('praise');speakSequence([selectedKey,'praise']);nextButton(()=>{if(++round<3)learn();else{round=0;sim()} })})}
 // Geometry uses metres, with the tabletop at y = 0.78.
-const tableY=.78, objectsAt=[[-.95,.92],[0,1.12],[.95,.92]];
+const tableY=.78, objectsAt=[[-1,.80],[1,.85],[.15,1.40]];
 const goals=[[-.86,tableY+.037,-.20],[-.045,tableY+.008,-.20],[.989,tableY+.065,-.13]];
 const floorCupY=.068;
 function insideGoal(index,x,z){const [gx,,gz]=goals[index];if(index===1)return Math.abs(x)<1.53&&Math.abs(z)<.63&&!insideGoal(0,x,z)&&!insideGoal(2,x,z);return index===2?Math.abs(x-gx)<.38&&Math.abs(z-gz)<.31:Math.hypot(x-gx,z-gz)<.33}
@@ -94,7 +94,7 @@ function surfaceUV(face){
 function addProps(m,positions,activeGoal){
  const {oval,box,lathe}=m;
  for(let i=0;i<positions.length;i++){
- const [x,y,z]=positions[i],floor=z>.70,base=floor?.064:tableY+.005;
+ const [x,y,z]=positions[i],floor=y<.30||z>.70,base=floor?.064:tableY+.005;
  if(floor||Math.abs(z)<.62){const r=[.16,.13,.22][i];m.lathe(x+.025+(y-base)*.15,base,z+.018,[[0,0],[r,.0003]],floor?'9e7560':'a77c52',0,.56,20)}
  skinProp(m,i,positions[i])}
  const [px,,pz]=goals[0], [wx2,,wz2]=goals[1], [bx,,bz]=goals[2];
@@ -183,22 +183,30 @@ function addOmaniChild(m,frame){
 function sim(){
  reset();const order=[1,0,2];let turn=0,target=order[turn],key=items[target][0],advanceAt=0;
  v.innerHTML=title('أستكشف البيت','<div class="task" id="goal">'+pic(key,items[target][1])+'</div>')+
- '<div class="room-frame"><canvas id="room3" tabindex="0" aria-label="مجلس ثلاثي الأبعاد. اسحب لتلتفت، واستعمل الأسهم للمشي. اسحب الغرض المطلوب إلى مكانه قرب الطفلة: التفاحة في الصحن، الماء على الطاولة، واللعبة في الكرتون."></canvas><div class="move-pad" dir="ltr"><button data-m="left" aria-label="تحرك يسارًا">◀</button><button data-m="forward" aria-label="تقدّم">▲</button><button data-m="right" aria-label="تحرك يمينًا">▶</button><button data-m="back" aria-label="تراجع">▼</button></div><button id="centerCamera" aria-label="واجه الطاولة">⌖</button></div><div class="footer"><span id="mark" class="feedback" role="status"></span>'+'<span id="steps">'+dots(turn)+'</span>'+'<button class="action" hidden id="next" aria-label="التالي">←</button></div>';
+ '<div class="room-frame"><canvas id="room3" tabindex="0" aria-label="مجلس ثلاثي الأبعاد. اسحب لتلتفت، واستعمل الأسهم للمشي. اسحب الغرض المطلوب إلى مكانه قرب الطفلة: التفاحة في الصحن، الماء على الطاولة، واللعبة في الكرتون."></canvas><div id="dropGuide" class="drop-guide" aria-hidden="true"></div><div class="move-pad" dir="ltr"><button data-m="left" aria-label="تحرك يسارًا">◀</button><button data-m="forward" aria-label="تقدّم">▲</button><button data-m="right" aria-label="تحرك يمينًا">▶</button><button data-m="back" aria-label="تراجع">▼</button></div><button id="centerCamera" aria-label="واجه الطاولة">⌖</button></div><div class="footer"><span id="mark" class="feedback" role="status"></span>'+'<span id="steps">'+dots(turn)+'</span>'+'<button class="action" hidden id="next" aria-label="التالي">←</button></div>';
  wire();const instructions=document.createElement('p');instructions.className='info sim-instructions';instructions.textContent='اسمع الطلب، ثم اسحب الغرض إلى الطفل';v.querySelector('.room-frame').before(instructions);const canvas=$('#room3'),renderer=roomRenderer(canvas),fixed=furnishedRoom(),starts=objectsAt.map(([x,z])=>[x,floorCupY,z]),pos=starts.map(p=>p.slice());
  const cam={x:0,y:1.48,z:2.85,yaw:0,pitch:-.22};
  let held=false,complete=false,gesture=null,frame=0,dirty=true,active=true,prev=0,resizeObs,aspect=1;
  let girlFrame=0;const reducedMotion=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;const movements=new Map();
- function updateGeometry(){const m=meshBuilder();addProps(m,pos,held?target:-1);addOmaniChild(m,girlFrame);renderer.set(fixed.concat(m.faces));dirty=true}
+ function updateGeometry(){const m=meshBuilder();addProps(m,pos,complete?-1:target);addOmaniChild(m,girlFrame);renderer.set(fixed.concat(m.faces));dirty=true}
  function size(){const r=canvas.getBoundingClientRect(),dpr=Math.min(1.7,window.devicePixelRatio||1);canvas.width=Math.max(2,Math.round(r.width*dpr));canvas.height=Math.max(2,Math.round(r.height*dpr));aspect=canvas.width/canvas.height;center();dirty=true}
  function center(){cam.x=0;cam.z=Math.max(3.1,2.85/aspect);cam.z=clamp(cam.z,2.1,4.55);cam.yaw=0;cam.pitch=Math.atan2(-.80,cam.z);dirty=true}
  function move(dir,dt){const speed=1.45*dt,f=dir==='forward'?1:dir==='back'?-1:0,r=dir==='right'?1:dir==='left'?-1:0;
  const x=clamp(cam.x+speed*(r*Math.cos(cam.yaw)+f*Math.sin(cam.yaw)),-3.95,3.95),z=clamp(cam.z+speed*(r*Math.sin(cam.yaw)-f*Math.cos(cam.yaw)),-1.64,4.55);
  const legal=(a,b)=>Math.abs(a)>1.84||Math.abs(b)>.94;
  if(legal(x,cam.z))cam.x=x;if(legal(cam.x,z))cam.z=z;dirty=true}
- function tick(now){if(!active)return;if(complete&&advanceAt&&performance.now()>=advanceAt&&!$('#config').open){advance();if(!active)return}const nextFrame=complete?(reducedMotion?2:1+Math.floor(now/230)%2):0;if(girlFrame!==nextFrame){girlFrame=nextFrame;updateGeometry()}const dt=Math.min(.045,(now-prev)/1000||0);prev=now;for(const dir of new Set(movements.values()))move(dir,dt);if(dirty){renderer.draw(cam);dirty=false}frame=requestAnimationFrame(tick)}
+ function tick(now){if(!active)return;if(complete&&advanceAt&&performance.now()>=advanceAt&&!$('#config').open){advance();if(!active)return}const nextFrame=complete?(reducedMotion?2:1+Math.floor(now/230)%2):0;if(girlFrame!==nextFrame){girlFrame=nextFrame;updateGeometry()}const dt=Math.min(.045,(now-prev)/1000||0);prev=now;for(const dir of new Set(movements.values()))move(dir,dt);if(dirty){renderer.draw(cam);drawGuide();dirty=false}frame=requestAnimationFrame(tick)}
  const xy=e=>{const r=canvas.getBoundingClientRect();return [(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height]};
  function place(){if(!held||complete)return;held=false;complete=true;pos[target]=goals[target].slice();girlFrame=1;updateGeometry();$('#mark').textContent='أحسنت! ✓';replay=()=>{};say('praise');advanceAt=performance.now()+(muted?2400:4500);if(player){const reward=player;reward.onended=()=>{if(active&&player===reward&&complete)advanceAt=performance.now()+1800}}}
- function destination(nx,ny){const p=cameraMath(cam,aspect).floorPoint(2*nx-1,1-2*ny,goals[target][1]);return p&&insideGoal(target,p[0],p[2])}
+ function project(p){const {view,f}=cameraMath(cam,aspect),[x,y,z]=view(p);return z>.05?[.5+x*f/(2*z*aspect),.5-y*f/(2*z)]:null}
+ function targetArea(){const r=canvas.getBoundingClientRect(),c=project([goals[target][0],goals[target][1]+.08,goals[target][2]]);if(!c)return null;
+ const neighbors=goals.map((g,i)=>i===target?null:project([g[0],g[1]+.08,g[2]])).filter(Boolean);
+ const halfX=Math.min(46/r.width,...neighbors.map(p=>Math.abs(p[0]-c[0])*.46));return {x:c[0],y:c[1],hx:halfX,hy:40/r.height}}
+ function destination(nx,ny){const a=targetArea();return a&&Math.abs(nx-a.x)<=a.hx&&Math.abs(ny-a.y)<=a.hy}
+ function drawGuide(){const guide=$('#dropGuide'),a=targetArea(),r=canvas.getBoundingClientRect();guide.hidden=complete||!a||a.x<0||a.x>1||a.y<0||a.y>1;if(!a)return;
+ Object.assign(guide.style,{left:(a.x*100)+'%',top:(a.y*100)+'%',width:(a.hx*2*r.width)+'px',height:(a.hy*2*r.height)+'px'});guide.textContent=''}
+ function pickupId(nx,ny,hit){if(hit>=1&&hit<=3)return hit;const r=canvas.getBoundingClientRect();let nearest=0,distance=36;
+ pos.forEach((p,i)=>{const c=project([p[0],p[1]+.18,p[2]]);if(!c)return;const d=Math.hypot((nx-c[0])*r.width,(ny-c[1])*r.height);if(d<distance){distance=d;nearest=i+1}});return nearest||hit}
  function dragPoint(nx,ny){const f=1/Math.tan(.54),u=(2*nx-1)*aspect/f,v=(1-2*ny)/f,cp=Math.cos(cam.pitch),sp=Math.sin(cam.pitch),sy=Math.sin(cam.yaw),cy=Math.cos(cam.yaw),fw=cp-v*sp,dz=u*sy-fw*cy,t=(.50-cam.z)/dz;
  if(t<=0||!isFinite(t))return null;return [cam.x+t*(u*cy+fw*sy),cam.y+t*(v*cp+sp)-.15,.50]}
  function returnProp(){held=false;pos[target]=starts[target].slice();updateGeometry()}
@@ -207,11 +215,11 @@ function sim(){
  target=order[turn];key=items[target][0];complete=false;girlFrame=0;held=false;gesture=null;
  $('#goal').innerHTML=pic(key,items[target][1]);$('#steps').innerHTML=dots(turn);$('#mark').textContent='';updateGeometry();childRequest()}
  function pick(id){if(complete||held||id<1||id>3)return;if(id!==target+1)return;held=true;pos[target][1]+=.23;$('#mark').textContent='';updateGeometry()}
- canvas.onpointerdown=e=>{if(gesture)return;e.preventDefault();const [nx,ny]=xy(e);const id=renderer.hit(cam,nx,ny);
+ canvas.onpointerdown=e=>{if(gesture)return;e.preventDefault();const [nx,ny]=xy(e);const id=pickupId(nx,ny,renderer.hit(cam,nx,ny));
  gesture={pointer:e.pointerId,id,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,drag:false,carrying:false};canvas.setPointerCapture(e.pointerId)};
  canvas.onpointermove=e=>{const g=gesture;if(!g||e.pointerId!==g.pointer)return;
  if(!g.drag&&Math.hypot(e.clientX-g.x,e.clientY-g.y)>6){g.drag=true;if(!complete&&g.id===target+1){if(!held)pick(g.id);g.carrying=held}}
- if(g.drag){if(g.carrying){const [nx,ny]=xy(e);const p=dragPoint(nx,ny);if(p){pos[target]=p;updateGeometry()}}
+ if(g.drag){if(g.carrying){const [nx,ny]=xy(e);const p=dragPoint(nx,ny);if(p){pos[target]=destination(nx,ny)?goals[target].slice():p;updateGeometry()}}
  else{cam.yaw-=(e.clientX-g.lastX)*.006;cam.pitch=clamp(cam.pitch+(e.clientY-g.lastY)*.005,-.94,.65);dirty=true}}
  g.lastX=e.clientX;g.lastY=e.clientY};
  canvas.onpointerup=e=>{const g=gesture;if(!g||e.pointerId!==g.pointer)return;gesture=null;
@@ -227,7 +235,7 @@ function sim(){
  $('#centerCamera').onclick=center;
  size();center();updateGeometry();renderer.draw(cam);if(typeof ResizeObserver!=='undefined'){resizeObs=new ResizeObserver(size);resizeObs.observe(canvas)}
  pauseRoom=()=>{movements.clear();if(held&&!complete)returnProp();gesture=null};cleanupRoom=()=>{active=false;cancelAnimationFrame(frame);resizeObs?.disconnect();renderer.dispose();pauseRoom=null;cleanupRoom=null};
- function childRequest(){const request=['أبا تفاح','أبا ماي','أبا اللعبة'][target];instructions.textContent=request+' — '+['حط التفاحة في الصحن','حط الماي فوق الطاولة','حط اللعبة في الكرتون'][target];replay=()=>say(items[target][0]);replay()}
+ function childRequest(){const request=['أبا تفاح','أبا ماي','أبا اللعبة'][target];instructions.textContent=request+' — '+['حط التفاحة في الصحن','حط الماي فوق الطاولة','حط اللعبة في الكرتون'][target]+' · ابحث عنه في المجلس';replay=()=>say(items[target][0]);replay()}
  childRequest();frame=requestAnimationFrame(tick)
 }
 function real(){reset();v.innerHTML=title('أطلب في البيت')+'<div class="panel"><p class="info">للمرافق · ضع الأغراض الحقيقية أمام الطفل، ثم دعه يطلب ما يريد.</p>'+row()+'<div id="give"></div></div>';wire();prompt('real','الحين نجرّب بالحقيقة. شو تريد؟');v.querySelectorAll('.choice').forEach((b,i)=>b.onclick=()=>{chosen=i;const [k,n,q]=items[i];v.querySelectorAll('.choice').forEach(c=>c.classList.toggle('correct',c===b));prompt(k,q);$('#give').innerHTML='<div class="realbox"><span class="big">🤲</span>'+pic(k,n)+'</div><p class="info">للمرافق · أعطِ الطفل ما طلبه، ثم أكّد الاستلام.</p><div class="footer"><button class="action" id="got">✓ استلم الغرض</button></div>';$('#got').onclick=()=>{reset();v.innerHTML=title('اكتمل الطلب')+'<div class="panel"><div class="realbox">'+pic(k,n)+'<span class="big">✓</span></div><div class="footer"><button class="action" id="again" aria-label="طلب آخر">↻</button><button class="icon" id="end" aria-label="العودة للبداية">⌂</button></div></div>';wire();prompt('done','تمّ');$('#again').onclick=real;$('#end').onclick=nav}})}
