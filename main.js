@@ -189,7 +189,7 @@ function sim(){
  let held=false,complete=false,gesture=null,frame=0,dirty=true,active=true,prev=0,resizeObs,aspect=1;
  let girlFrame=0;const reducedMotion=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;const movements=new Map();
  function updateGeometry(){const m=meshBuilder();addProps(m,pos,held?target:-1);addOmaniChild(m,girlFrame);renderer.set(fixed.concat(m.faces));dirty=true}
- function size(){const r=canvas.getBoundingClientRect(),dpr=Math.min(1.7,window.devicePixelRatio||1);canvas.width=Math.max(2,Math.round(r.width*dpr));canvas.height=Math.max(2,Math.round(r.height*dpr));aspect=canvas.width/canvas.height;dirty=true}
+ function size(){const r=canvas.getBoundingClientRect(),dpr=Math.min(1.7,window.devicePixelRatio||1);canvas.width=Math.max(2,Math.round(r.width*dpr));canvas.height=Math.max(2,Math.round(r.height*dpr));aspect=canvas.width/canvas.height;center();dirty=true}
  function center(){cam.x=0;cam.z=Math.max(3.1,2.85/aspect);cam.z=clamp(cam.z,2.1,4.55);cam.yaw=0;cam.pitch=Math.atan2(-.80,cam.z);dirty=true}
  function move(dir,dt){const speed=1.45*dt,f=dir==='forward'?1:dir==='back'?-1:0,r=dir==='right'?1:dir==='left'?-1:0;
  const x=clamp(cam.x+speed*(r*Math.cos(cam.yaw)+f*Math.sin(cam.yaw)),-3.95,3.95),z=clamp(cam.z+speed*(r*Math.sin(cam.yaw)-f*Math.cos(cam.yaw)),-1.64,4.55);
